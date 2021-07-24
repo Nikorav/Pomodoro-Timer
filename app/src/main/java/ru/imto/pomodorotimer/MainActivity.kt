@@ -1,62 +1,106 @@
 package ru.imto.pomodorotimer
 
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.widget.Toast
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.OnLifecycleEvent
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.recyclerview.widget.LinearLayoutManager
 import ru.imto.pomodorotimer.databinding.ActivityMainBinding
 
-class MainActivity : AppCompatActivity(),PomodoroTimerListener {
+
+class MainActivity : AppCompatActivity(), PomodoroTimerListener, LifecycleObserver {
+
+    private val pomodoroTimers = mutableListOf<PomodoroTimer>()
+    private val pomodoroTimerAdapter = PomodoroTimerAdapter(this)
+    private var nextId = 0
+    private var minutesInput = ""
+    private var minutesToMs: Long = 0
 
     private lateinit var binding: ActivityMainBinding
 
-    private val stopwatchAdapter = PomodoroTimerAdapter(this)
-    private val stopwatches = mutableListOf<PomodoroTimer>()
-    private var nextId = 0
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         binding = ActivityMainBinding.inflate(layoutInflater)
+
         setContentView(binding.root)
 
-        binding.recycler.apply {
+        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+
+        binding.recyclerView.apply {
             layoutManager = LinearLayoutManager(context)
-            adapter = stopwatchAdapter
+            adapter = pomodoroTimerAdapter
         }
 
-        binding.addNewStopwatchButton.setOnClickListener {
-            stopwatches.add(PomodoroTimer(nextId++, 0, 0 ,true))
-            stopwatchAdapter.submitList(stopwatches.toList())
+        binding.addButton.setOnClickListener{
+            minutesInput = binding.textInput.text.toString()
+            if (minutesInput.isEmpty()) {
+                Toast.makeText(this, "Введите количество минут для отсчета", Toast.LENGTH_SHORT)
+                    .show()
+            }else {
+                minutesToMs = (minutesInput.toInt() * 60 * 1000).toLong()
+                pomodoroTimers.add(PomodoroTimer(nextId++, minutesToMs,minutesToMs, false))
+                pomodoroTimerAdapter.submitList(pomodoroTimers.toList())
+            }
         }
+
     }
+
     override fun start(id: Int) {
-        changeStopwatch(id, null, true)
+        val stopTimers = mutableListOf<PomodoroTimer>()
+        pomodoroTimers.forEach {
+            stopTimers.add(PomodoroTimer(it.id,it.currentMs,it.startMs,false))
+        }
+        pomodoroTimerAdapter.submitList(stopTimers)
+        pomodoroTimers.clear()
+        pomodoroTimers.addAll(stopTimers)
+        changeTimerState(id, null, true)
     }
 
     override fun stop(id: Int, currentMs: Long) {
-        changeStopwatch(id, currentMs, false)
-    }
-
-    override fun reset(id: Int) {
-        changeStopwatch(id, 0L, false)
+        changeTimerState(id, currentMs, false)
     }
 
     override fun delete(id: Int) {
-        stopwatches.remove(stopwatches.find { it.id == id })
-        stopwatchAdapter.submitList(stopwatches.toList())
+        pomodoroTimers.remove(pomodoroTimers.find { it.id == id })
+        pomodoroTimerAdapter.submitList(pomodoroTimers.toList())
     }
 
-    private fun changeStopwatch(id: Int, currentMs: Long?, isStarted: Boolean) {
+    private fun changeTimerState(id: Int, currentMs: Long?, isStarted: Boolean) {
         val newTimers = mutableListOf<PomodoroTimer>()
-        stopwatches.forEach {
+        pomodoroTimers.forEach {
             if (it.id == id) {
                 newTimers.add(PomodoroTimer(it.id, currentMs ?: it.currentMs,it.startMs, isStarted))
             } else {
                 newTimers.add(it)
             }
         }
-        stopwatchAdapter.submitList(newTimers)
-        stopwatches.clear()
-        stopwatches.addAll(newTimers)
+        pomodoroTimerAdapter.submitList(newTimers)
+        pomodoroTimers.clear()
+        pomodoroTimers.addAll(newTimers)
     }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
+    fun onAppBackgrounded() {
+        pomodoroTimers.forEach {
+            if (it.isStarted) {
+                val startIntent = Intent(this, ForegroundService::class.java)
+                startIntent.putExtra(COMMAND_ID, COMMAND_START)
+                startIntent.putExtra(STARTED_TIMER_TIME_MS, it)
+                startService(startIntent)
+            }
+
+        }
+    }
+
+    @OnLifecycleEvent(Lifecycle.Event.ON_START)
+    fun onAppForegrounded() {
+        val stopIntent = Intent(this, ForegroundService::class.java)
+        stopIntent.putExtra(COMMAND_ID, COMMAND_STOP)
+        startService(stopIntent)
+    }
+
 }

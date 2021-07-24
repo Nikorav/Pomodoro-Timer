@@ -4,7 +4,7 @@ import java.io.Serializable
 
 data class PomodoroTimer (
     val id: Int,
-    var startMs: Long,
     var currentMs: Long,
+    var startMs: Long,
     var isStarted: Boolean
 ) : Serializable
