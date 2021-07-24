@@ -5,12 +5,12 @@ import android.os.Bundle
 import androidx.recyclerview.widget.LinearLayoutManager
 import ru.imto.pomodorotimer.databinding.ActivityMainBinding
 
-class MainActivity : AppCompatActivity(),StopwatchListener {
+class MainActivity : AppCompatActivity(),PomodoroTimerListener {
 
     private lateinit var binding: ActivityMainBinding
 
-    private val stopwatchAdapter = StopwatchAdapter(this)
-    private val stopwatches = mutableListOf<Stopwatch>()
+    private val stopwatchAdapter = PomodoroTimerAdapter(this)
+    private val stopwatches = mutableListOf<PomodoroTimer>()
     private var nextId = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,7 +25,7 @@ class MainActivity : AppCompatActivity(),StopwatchListener {
         }
 
         binding.addNewStopwatchButton.setOnClickListener {
-            stopwatches.add(Stopwatch(nextId++, 0, true))
+            stopwatches.add(PomodoroTimer(nextId++, 0, 0 ,true))
             stopwatchAdapter.submitList(stopwatches.toList())
         }
     }
@@ -47,10 +47,10 @@ class MainActivity : AppCompatActivity(),StopwatchListener {
     }
 
     private fun changeStopwatch(id: Int, currentMs: Long?, isStarted: Boolean) {
-        val newTimers = mutableListOf<Stopwatch>()
+        val newTimers = mutableListOf<PomodoroTimer>()
         stopwatches.forEach {
             if (it.id == id) {
-                newTimers.add(Stopwatch(it.id, currentMs ?: it.currentMs, isStarted))
+                newTimers.add(PomodoroTimer(it.id, currentMs ?: it.currentMs,it.startMs, isStarted))
             } else {
                 newTimers.add(it)
             }

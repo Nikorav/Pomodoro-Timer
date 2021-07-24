@@ -1,7 +1,10 @@
 package ru.imto.pomodorotimer
 
-data class Stopwatch (
+import java.io.Serializable
+
+data class PomodoroTimer (
     val id: Int,
+    var startMs: Long,
     var currentMs: Long,
     var isStarted: Boolean
-)
+) : Serializable
