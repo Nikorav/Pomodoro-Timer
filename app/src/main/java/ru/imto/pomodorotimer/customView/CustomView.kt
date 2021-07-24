@@ -1,4 +1,4 @@
-package ru.imto.pomodorotimer
+package ru.imto.pomodorotimer.customView
 
 import android.content.Context
 import android.graphics.Canvas
@@ -7,6 +7,7 @@ import android.graphics.Paint
 import android.util.AttributeSet
 import android.view.View
 import androidx.annotation.AttrRes
+import ru.imto.pomodorotimer.R
 
 class CustomView @JvmOverloads constructor(
     context: Context,
@@ -55,23 +56,17 @@ class CustomView @JvmOverloads constructor(
         )
     }
 
-    /**
-     * Set lasted milliseconds
-     */
     fun setCurrent(current: Long) {
         currentMs = current
         invalidate()
     }
 
-    /**
-     * Set time period
-     */
+
     fun setPeriod(period: Long) {
         periodMs = period
     }
 
     private companion object {
-
         private const val FILL = 0
     }
 }

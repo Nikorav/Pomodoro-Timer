@@ -1,4 +1,4 @@
-package ru.imto.pomodorotimer
+package ru.imto.pomodorotimer.recyclerView
 
 import android.view.LayoutInflater
 import android.view.ViewGroup

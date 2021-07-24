@@ -1,5 +1,4 @@
-package ru.imto.pomodorotimer
-
+package ru.imto.pomodorotimer.service
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,19 +6,23 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.media.MediaPlayer
 import android.os.Build
-import android.os.CountDownTimer
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
+import ru.imto.pomodorotimer.*
+import ru.imto.pomodorotimer.recyclerView.PomodoroTimer
+import ru.imto.pomodorotimer.constants.*
 
 class ForegroundService : Service() {
 
     private var isServiceStarted = false
     private var notificationManager: NotificationManager? = null
     private var job: Job? = null
-    private var timer:PomodoroTimer? = null
+    private var pomodoroTimer: PomodoroTimer? = null
+    private var mediaPlayer: MediaPlayer? = null
+
 
     private val builder by lazy {
         NotificationCompat.Builder(this, CHANNEL_ID)
@@ -51,46 +54,43 @@ class ForegroundService : Service() {
     private fun processCommand(intent: Intent?) {
         when (intent?.extras?.getString(COMMAND_ID) ?: INVALID) {
             COMMAND_START -> {
-                timer = intent?.extras?.getSerializable(STARTED_TIMER_TIME_MS) as PomodoroTimer ?: return
-                commandStart(timer!!)
+                pomodoroTimer =
+                    intent?.extras?.getSerializable(STARTED_TIMER_TIME_MS) as PomodoroTimer
+                commandStart(pomodoroTimer!!)
             }
             COMMAND_STOP -> commandStop()
             INVALID -> return
         }
     }
 
-    private fun commandStart(timer: PomodoroTimer) {
-        if (isServiceStarted) {
-            return
-        }
-        Log.i("TAG", "commandStart()")
+    private fun commandStart(pomodoroTimer: PomodoroTimer) {
+        if (isServiceStarted) return
         try {
-            if (timer.currentMs.toInt() != 0) {
+            if (pomodoroTimer.currentMs.toInt() != 0) {
                 moveToStartedState()
                 startForegroundAndShowNotification()
-                continueTimer(timer)
+                continueTimer(pomodoroTimer)
             }
         } finally {
             isServiceStarted = true
         }
     }
 
-    private fun continueTimer(timer: PomodoroTimer) {
-        job = CoroutineScope(Dispatchers.Main).launch{
-            while (timer.currentMs >= 0) {
-                if(timer.currentMs.toInt() <= 0) stopForeground(true)
+    private fun continueTimer(pomodoroTimer: PomodoroTimer) {
+        job = CoroutineScope(Dispatchers.Main).launch {
+            while (pomodoroTimer.currentMs >= 0) {
+                if (pomodoroTimer.currentMs.toInt() <= 0) stopForeground(true)
                 notificationManager?.notify(
                     NOTIFICATION_ID,
-                    getNotification(
-                        (timer.currentMs).displayTime()
-
-                    )
+                    getNotification((pomodoroTimer.currentMs).displayTime())
                 )
-                Log.d("TAG","Timer current ms: ${timer.currentMs}")
-                timer.currentMs -= INTERVAL
+                pomodoroTimer.currentMs -= INTERVAL
                 delay(INTERVAL)
-                if (timer.currentMs.toInt() <= 0) commandStop()
-                Log.d("TAG"," Timer current ms to int = ${timer.currentMs} ")
+                if (pomodoroTimer.currentMs.toInt() <= 0) {
+                    commandStop()
+                    mediaPlayer = MediaPlayer.create(applicationContext,R.raw.pip)
+                    mediaPlayer?.start()
+                }
             }
         }
     }
@@ -99,7 +99,6 @@ class ForegroundService : Service() {
         if (!isServiceStarted) {
             return
         }
-        Log.i("TAG", "commandStop()")
         try {
             job?.cancel()
             stopForeground(true)
@@ -107,16 +106,14 @@ class ForegroundService : Service() {
         } finally {
             isServiceStarted = false
         }
+
     }
 
     private fun moveToStartedState() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Log.d("TAG", "moveToStartedState(): Running on Android O or higher")
             startForegroundService(Intent(this, ForegroundService::class.java))
-        } else {
-            Log.d("TAG", "moveToStartedState(): Running on Android N or lower")
-            startService(Intent(this, ForegroundService::class.java))
         }
+        else startService(Intent(this, ForegroundService::class.java))
     }
 
     private fun startForegroundAndShowNotification() {
@@ -127,10 +124,9 @@ class ForegroundService : Service() {
 
     private fun getNotification(content: String) = builder.setContentText(content).build()
 
-
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelName = "pomodoro"
+            val channelName = "pomodoroTimer"
             val importance = NotificationManager.IMPORTANCE_DEFAULT
             val notificationChannel = NotificationChannel(
                 CHANNEL_ID, channelName, importance
@@ -145,28 +141,16 @@ class ForegroundService : Service() {
         return PendingIntent.getActivity(this, 0, resultIntent, PendingIntent.FLAG_ONE_SHOT)
     }
 
-    private fun getCountDownTimer(timer: PomodoroTimer): CountDownTimer {
-
-        return object : CountDownTimer(timer.currentMs, UNIT_TEN_MS) {
-
-            override fun onTick(millisUntilFinished: Long) {
-                timer.currentMs = millisUntilFinished
-                timer.currentMs.displayTime()
-            }
-            override fun onFinish() {
-                stopSelf()
-            }
-        }
-    }
-
     override fun onDestroy() {
+        val stopIntent = Intent(this, ForegroundService::class.java)
+        stopIntent.putExtra(COMMAND_ID, COMMAND_STOP)
+        startService(stopIntent)
         super.onDestroy()
     }
 
     private companion object {
-
         private const val CHANNEL_ID = "Channel_ID"
-        private const val NOTIFICATION_ID = 777
+        private const val NOTIFICATION_ID = 666
         private const val INTERVAL = 1000L
     }
 }

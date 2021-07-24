@@ -1,4 +1,4 @@
-package ru.imto.pomodorotimer
+package ru.imto.pomodorotimer.recyclerView
 
 interface PomodoroTimerListener {
     fun start(id: Int)
